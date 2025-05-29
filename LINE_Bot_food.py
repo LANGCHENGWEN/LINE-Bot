@@ -6,23 +6,23 @@ from flask import (
 )
 '''
 引入 Flask 框架與其常用方法：
-Flask: 建立 Web 應用
-request: 取得 HTTP 請求內容
-abort: 觸發 HTTP 錯誤（如 400）
-render_template: 用來渲染 HTML 模板（目前未使用）
+Flask: 建立 Web 應用，用它來定義路由、設定參數等[建立應用程式主體]
+request: 用來存取 HTTP 請求中的資訊，例如使用者傳來的資料、表單、參數等[取得用戶端送來的資料]
+abort: 用來終止請求流程，並回傳錯誤狀態碼（例如 404、403、400）[主動回應錯誤，停止處理請求]
+render_template: 用來渲染 HTML 模板，會從 /templates 資料夾中載入 .html 檔案（目前未使用）[用來輸出 HTML 頁面並傳入變數]
 '''
 
-from linebot.v3 import (
-    WebhookHandler
+from linebot.v3 import (    #linebot.v3 是套件的主要入口，用來處理 LINE Bot 與 LINE 伺服器之間的 webhook 互動
+    WebhookHandler    #這個類別是用來接收、解析並處理從 LINE 傳過來的 webhook 事件（如文字訊息、貼圖、追蹤事件等）
 )
 #匯入 LINE Bot SDK 中的 Webhook 處理器，用來處理事件
 
-from linebot.v3.exceptions import (
-    InvalidSignatureError
+from linebot.v3.exceptions import (    #linebot.v3.exceptions 是 LINE Bot SDK 中的例外處理模組，裡面定義了在使用 SDK 時，可能會遇到的錯誤型別
+    InvalidSignatureError    #這個例外是用來處理「簽章驗證失敗」的情況
 )
 #用於處理錯誤的例外狀況
 
-from linebot.v3.messaging import (
+from linebot.v3.messaging import (    #從 linebot.v3.messaging 模組中，匯入幾個「處理傳送訊息」相關的重要類別
     Configuration,
     ApiClient,
     MessagingApi,
@@ -31,36 +31,36 @@ from linebot.v3.messaging import (
 )
 '''
 匯入與訊息傳遞有關的設定與物件：
-Configuration: 配置 access token
-ApiClient: API 操作的客戶端
-MessagingApi: 傳送訊息的主體
-ReplyMessageRequest: 回覆用戶的請求
-TextMessage: 用來建立純文字訊息
+Configuration: 設定 LINE Messaging API 所需的參數，例如存取權杖（access token）[設定 API 的存取權杖等參數]
+ApiClient: 建立與 LINE Messaging API 的 HTTP 連線客戶端[建立 API 用的連線客戶端]
+MessagingApi: 這是主要的 API 操作介面，包含像 reply_message()、push_message() 等方法，用來傳送訊息[提供傳訊息的功能（如回覆、推播等）]
+ReplyMessageRequest: 建立「回覆訊息」的請求物件，用來指定要回傳給使用者的訊息內容[包裝回覆訊息請求（含 reply token 與訊息）]
+TextMessage: 建立一個純文字訊息物件，會作為回傳給使用者的內容之一，想要傳回給 LINE 使用者的一句話[單一純文字訊息的格式]
 '''
 
-from linebot.v3.webhooks import (
+from linebot.v3.webhooks import (    #從 LINE Bot SDK 中的 linebot.v3.webhooks 模組匯入「處理使用者訊息」相關的類別
     MessageEvent,FollowEvent, # 傳輸過來的方法
     TextMessageContent, # 使用者傳過來的資料格式\
 )
 '''
 匯入 webhook 事件與訊息格式：
-MessageEvent: 接收訊息事件
-FollowEvent: 新加入好友事件
-TextMessageContent: 傳入文字訊息格式
+MessageEvent: 接收訊息事件，表示使用者傳送的「訊息事件」[使用者傳送訊息（文字、圖片等）時觸發]
+FollowEvent: 新加入好友事件，表示使用者「加入好友」時觸發的事件[使用者加入好友（首次或重新加入）時觸發]
+TextMessageContent: 傳入文字訊息格式，用來取得使用者傳來的「純文字訊息」內容
 '''
 
 import pandas as pd    #pandas: 用來處理 CSV 資料
 from handle_keys import get_secret_and_token    #get_secret_and_token: 自定義函式，取得金鑰
 from import_modules import *
-from create_linebot_messages_sample import *    #import_modules, create_linebot_messages_sample: 其他自定義模組（應為功能元件）
+from create_linebot_messages_sample import *    #import_modules, create_linebot_messages_sample: 其他自定義模組（應為功能元件），全部匯入
 from collections import defaultdict    #defaultdict: 預設字典結構，這裡雖引入但未使用
 
-app = Flask(__name__)    #建立 Flask 應用
-keys = get_secret_and_token()
-handler = WebhookHandler(keys['LINEBOT_SECRET_KEY'])    #從模組中讀取 LINE 的密鑰與 Token
-configuration = Configuration(access_token=keys['LINEBOT_ACCESS_TOKEN'])    #建立 LINE webhook 處理器與 API 設定
+app = Flask(__name__)    #建立 Flask 應用，準備接收 HTTP 請求
+keys = get_secret_and_token()    #呼叫自定義函式 get_secret_and_token()，從模組中讀取 LINE 的 secret 與 Token
+handler = WebhookHandler(keys['LINEBOT_SECRET_KEY'])    #建立 LINE Bot 的 WebhookHandler 處理器
+configuration = Configuration(access_token=keys['LINEBOT_ACCESS_TOKEN'])    #建立 LINE Bot 的 API 存取設定[設定連接 LINE Messaging API 所需的 access token]
 
-rest_recommand_memory = dict()    #使用者的推薦資料記憶體（依 user_id 暫存）
+rest_recommand_memory = dict()    #建立一個空的字典，並將它指定給變數 rest_recommand_memory，用來儲存「使用者的餐廳推薦記憶」
 
 rest_dict = {
     'breakfast_rest': pd.read_csv('taichungeatba/breakfast_rest.csv').dropna(axis=1).groupby('區域'),
@@ -68,6 +68,7 @@ rest_dict = {
     'dinner_rest': pd.read_csv('taichungeatba/dinner_rest.csv').dropna(axis=1).groupby('區域')
 }
 #分別讀取早餐、午餐、晚餐的資料，依「區域」分組
+#把含有空值的欄（column） 移除（axis=1 代表欄）
 
 @app.route("/callback", methods=['POST'])
 def callback():    #當 LINE 發送 Webhook 事件到 /callback，會由這個函式處理
