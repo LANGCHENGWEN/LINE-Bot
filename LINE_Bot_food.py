@@ -186,29 +186,43 @@ def handle_choose_time():    #定義一個函式 handle_choose_time()，不需�
         template=response    #把剛剛建立的 ButtonsTemplate 傳入這個 TemplateMessage
     )
 
-def handle_choose_section(user_id, time_message):
-    def create_quick_reply_item(section_name):
-        return QuickReplyItem(action=MessageAction(text=f'#{section_name}', label=f'{section_name}'))
+def handle_choose_section(user_id, time_message):    #定義函式 handle_choose_section()，接收兩個參數
+    def create_quick_reply_item(section_name):    #用來根據傳入的「區域名稱」，建立一個快速回覆項目（Quick Reply）
+        return QuickReplyItem(action=MessageAction(text=f'#{section_name}', label=f'{section_name}'))    #label=f'{section_name}'：按鈕顯示的文字，text=f'#{section_name}'：點按後會傳出的訊息，會被後續處理
 
-    if time_message == '#文青早餐':
+    if time_message == '#文青早餐':    #根據使用者選擇的時段，從 rest_dict 字典中取得對應的餐廳資料分組（例如早餐餐廳）
         rest_groups = rest_dict['breakfast_rest']
     elif time_message == '#在地午餐':
         rest_groups = rest_dict['lunch_rest']
     elif time_message == '#高檔晚餐':
         rest_groups = rest_dict['dinner_rest']
+    #rest_dict 是一個全域字典，應該包含三個 key（如 'breakfast_rest', 'lunch_rest', 'dinner_rest'）
+    #每個 key 裡面對應的 rest_groups 是一個餐廳區域分類群（dict-like object）
     
-    rest_recommand_memory[user_id] = rest_groups
+    rest_recommand_memory[user_id] = rest_groups    #記錄使用者的選擇結果（早餐/午餐/晚餐對應的餐廳群），存在全域變數 rest_recommand_memory 中
+    #以 user_id 為 key，儲存使用者目前對應的餐廳區域資料
+    #日後根據這個資訊可以推薦不同區域的餐廳
 
+    sections = rest_groups.groups.keys()    #取得餐廳分組中的所有「區域名稱」，例如「中正區」、「信義區」等等。rest_groups.groups 是一個 dict-like 結構，裡面每個 key 是一個區域
+    quick_reply_items = [create_quick_reply_item(section) for section in sections]    #用 list comprehension 建立所有區域的快速回覆按鈕項目
+    quick_reply_body = QuickReply(items=quick_reply_items)    #建立一個 QuickReply 物件，包含上面建立的所有快速回覆項目
 
-    sections = rest_groups.groups.keys()
-    quick_reply_items = [create_quick_reply_item(section) for section in sections]
-    quick_reply_body = QuickReply(items=quick_reply_items)
-
-    return TextMessage(
-        text="請選擇你的所在區域~",
-        quickReply=quick_reply_body
+    return TextMessage(    #回傳一個 LINE 的文字訊息物件 TextMessage
+        text="請選擇你的所在區域~",    #訊息內容是 "請選擇你的所在區域~"
+        quickReply=quick_reply_body    #下方會顯示快速回覆按鈕（Quick Reply）供使用者選擇區域
     )
   #根據餐別讀取對應的區域群組，並用 quick reply 顯示區域選項
+'''第1行
+user_id：使用者的 LINE ID（用來記錄使用者狀態）
+time_message：使用者剛剛選擇的時間類型（如 #文青早餐）
+'''
+'''def函式整段概要:
+1.選擇時段:使用者點選 #文青早餐 等
+2.查找資料:從 rest_dict 中取得對應餐廳群組
+3.記錄狀態:儲存在 rest_recommand_memory[user_id]
+4.建立按鈕:針對各區域建立 Quick Reply 按鈕
+5.回傳訊息:要求使用者選擇所在區域（附帶快速回覆）
+'''
 
 def handle_rests_recommand(user_id, section_name):
     def create_rest_col(rest_text, rest_title, rest_comment="",rest_address="",rest_phon="",rest_url=""):
